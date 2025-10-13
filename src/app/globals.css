@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root{
+  --ring: 0 0% 0%;
+}
+
+html, body { height: 100%; }
+body { color: #232826; background: #ffffff; }
+
+.container-section { @apply container max-w-7xl; }
+
+.btn{ @apply inline-flex items-center justify-center rounded-md px-5 py-3 border text-sm font-semibold transition; }
+.btn-primary{ @apply border-white text-white hover:bg-white/10; }
+.btn-outline-dark{ @apply border-slate-600 text-slate-800 hover:bg-slate-50; }
+.btn-outline-light{ @apply border-white text-white hover:bg-white/10; }
+
+.hatch {
+  background-image: repeating-linear-gradient(135deg, rgba(0,0,0,0.08) 0, rgba(0,0,0,0.08) 6px, transparent 6px, transparent 12px);
+}
+
+.card { @apply rounded-xl border border-slate-200 bg-white p-6 shadow-soft; }
+.section{ @apply py-16 md:py-24; }
+.section-muted{ @apply bg-slate-50; }
