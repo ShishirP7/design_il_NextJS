@@ -25,7 +25,7 @@ export function Hero() {
             <h1 className="mt-4 text-4xl font-extrabold leading-tight md:text-5xl">
               Building innovators for <br /> real-world change
             </h1>
-            <p className="mt-5 text-sm leading-relaxed opacity-95">
+            <p className="mt-5 text-sm leading-relaxed opacity-95 text-balance">
               We believe in equipping socially focused organizations
               (nonprofits, social enterprises, foundations, and schools) with
               the mindsets, frameworks, and tools to create innovators who

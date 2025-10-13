@@ -38,11 +38,12 @@ export function ExpertsDomains() {
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             {[
-              "Quality Assurance Consulting",
-              "Regulatory Affairs Consulting",
-              "Finance Affairs Consulting",
-              "Talent Acquisition and Recruiting",
-              "Auditing and Gap Assessments",
+              "Introduction to human-centered design workshops",
+              "Design Sprints",
+              "Creative teams workshops",
+              "Systems mapping workshops",
+              "Creative Coaching",
+              "Strategic Planning",
             ].map((t, i) => (
               <div key={i} className="flex gap-4">
                 <div className="text-emerald-800 text-3xl font-extrabold">
