@@ -1,109 +1,217 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import * as webllm from "@mlc-ai/web-llm";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { MessageCircle, X, Minus, Send, Loader2 } from "lucide-react";
 
-const SYSTEM = `You are a helpful website assistant. Keep answers brief.`;
+type Msg = { role: "user" | "assistant"; content: string };
 
-export default function ChatWidget() {
+type ChatWidgetProps = {
+  /** Override API base. Defaults to NEXT_PUBLIC_CHAT_API or http://localhost:9001 */
+  apiBase?: string;
+  /** Panel title */
+  title?: string;
+  /** Width class e.g. w-80, w-96, w-[26rem] */
+  widthClass?: string;
+  /** Height class e.g. h-[22rem], h-[28rem] */
+  heightClass?: string;
+  /** “bottom-right” | “bottom-left” */
+  position?: "bottom-right" | "bottom-left";
+  /** Input placeholder */
+  placeholder?: string;
+};
+
+export default function ChatWidget({
+  apiBase,
+  title = "Ask about our website",
+  widthClass = "w-96",
+  heightClass = "h-[28rem]",
+  position = "bottom-right",
+  placeholder = "Type a question…",
+}: ChatWidgetProps) {
+  const API_BASE =
+    useMemo(
+      () =>
+        (apiBase ??
+          process.env.NEXT_PUBLIC_CHAT_API?.replace(/\/$/, "") ??
+          "http://localhost:9001"),
+      [apiBase]
+    );
+
   const [open, setOpen] = useState(false);
-  const [ready, setReady] = useState(false);
-  const [msg, setMsg] = useState("");
-  const [log, setLog] = useState<{ role: "user" | "assistant"; content: string }[]>([
-    { role: "assistant", content: "Hi! Ask me about our site." },
+  const [minimized, setMinimized] = useState(false);
+  const [messages, setMessages] = useState<Msg[]>([
+    { role: "assistant", content: "Hi! I can answer questions about our company and services." },
   ]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [unread, setUnread] = useState(false);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // ✅ Type the ref correctly:
-  const engineRef = useRef<webllm.MLCEngineInterface | null>(null);
-
+  // auto-scroll to bottom on new messages
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        if (!("gpu" in navigator)) {
-          setLog((l) => [...l, { role: "assistant", content: "WebGPU not supported. Try Chrome/Edge." }]);
-          return;
-        }
-        const engine = await webllm.CreateMLCEngine(
-          "Llama-3.2-3B-Instruct-q4f16_1", // or "Llama-3.2-1B-Instruct-q4f16_1"
-          {
-            initProgressCallback: (p) => p?.text && setLog((l) => [...l, { role: "assistant", content: p.text! }]),
-          }
-        );
-        if (cancelled) return;
-        engineRef.current = engine;     // ✅ now type-safe
-        setReady(true);
-      } catch (e) {
-        setLog((l) => [...l, { role: "assistant", content: "Failed to load model. Refresh or try a different browser." }]);
-      }
-    })();
-    return () => {
-      cancelled = true;
+    scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight });
+    if (!open) setUnread(true);
+  }, [messages, open]);
+
+  // close on ESC
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && open) setOpen(false);
     };
-  }, []);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  // autosize textarea
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.height = Math.min(el.scrollHeight, 120) + "px";
+  }, [input]);
 
   async function send() {
-    const q = msg.trim();
-    if (!q || !engineRef.current) return;
+    const q = input.trim();
+    if (!q || loading) return;
 
-    setLog((l) => [...l, { role: "user", content: q }]);
-    setMsg("");
+    setMessages((m) => [...m, { role: "user", content: q }, { role: "assistant", content: "…" }]);
+    setInput("");
+    setLoading(true);
 
-    const reply = await engineRef.current.chat.completions.create({
-      messages: [
-        { role: "system", content: SYSTEM },
-        ...log,
-        { role: "user", content: q },
-      ],
-      temperature: 0.2,
-      stream: false,
-    });
+    try {
+      const res = await fetch(`${API_BASE}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: q }),
+      });
 
-    const text = reply?.choices?.[0]?.message?.content?.trim() || "Sorry, I couldn’t respond.";
-    setLog((l) => [...l, { role: "assistant", content: text }]);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: { reply?: string; error?: string } = await res.json();
+
+      setMessages((m) => {
+        const next = [...m];
+        next[next.length - 1] = {
+          role: "assistant",
+          content: (data.reply ?? "Sorry, I couldn’t generate a response.").trim(),
+        };
+        return next;
+      });
+    } catch {
+      setMessages((m) => {
+        const next = [...m];
+        next[next.length - 1] = {
+          role: "assistant",
+          content:
+            "Hmm, I couldn’t reach the chat service. Make sure the API at :9001 is running with CORS enabled.",
+        };
+        return next;
+      });
+    } finally {
+      setLoading(false);
+    }
   }
+
+  const cornerClasses =
+    position === "bottom-left"
+      ? "left-6 bottom-6"
+      : "right-6 bottom-6";
 
   return (
     <>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="fixed bottom-6 right-6 rounded-full bg-[#0c693c] px-4 py-3 text-white shadow-lg"
-      >
-        {open ? "Close" : "Chat"}
-      </button>
+      {/* Launcher button */}
+      {!open && (
+        <button
+          onClick={() => {
+            setOpen(true);
+            setUnread(false);
+          }}
+          aria-label="Open chat"
+          className={`fixed ${cornerClasses} z-50 flex items-center gap-2 rounded-full bg-[#0c693c] px-4 py-3 text-white shadow-lg`}
+        >
+          <MessageCircle className="h-5 w-5" />
+          <span className="text-sm font-semibold">Chat</span>
+          {unread && <span className="ml-1 inline-block h-2 w-2 rounded-full bg-white" />}
+        </button>
+      )}
 
+      {/* Panel */}
       {open && (
-        <div className="fixed bottom-20 right-6 w-80 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
-          <div className="border-b p-3 text-sm font-semibold">Ask about our website</div>
-          <div className="max-h-80 space-y-3 overflow-y-auto p-3 text-sm">
-            {log.map((m, i) => (
-              <div key={i} className={m.role === "user" ? "text-right" : ""}>
-                <div
-                  className={`inline-block rounded-lg px-3 py-2 ${
-                    m.role === "user" ? "bg-emerald-50 text-emerald-900" : "bg-slate-100 text-slate-800"
-                  }`}
-                >
-                  {m.content}
-                </div>
+        <div
+          className={`fixed ${cornerClasses} z-50 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl ${widthClass}`}
+          role="dialog"
+          aria-label="Website chat"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between border-b px-3 py-2">
+            <div className="text-sm font-semibold">{title}</div>
+            <div className="flex items-center gap-1">
+              <button
+                aria-label={minimized ? "Restore chat" : "Minimize chat"}
+                className="rounded p-1 hover:bg-slate-100"
+                onClick={() => setMinimized((m) => !m)}
+              >
+                {minimized ? <MessageCircle className="h-4 w-4" /> : <Minus className="h-4 w-4" />}
+              </button>
+              <button
+                aria-label="Close chat"
+                className="rounded p-1 hover:bg-slate-100"
+                onClick={() => setOpen(false)}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Body */}
+          {!minimized && (
+            <>
+              <div
+                ref={scrollerRef}
+                className={`px-3 py-3 text-sm ${heightClass} overflow-y-auto space-y-3`}
+              >
+                {messages.map((m, i) => (
+                  <div key={i} className={m.role === "user" ? "text-right" : ""}>
+                    <div
+                      className={`inline-block max-w-[85%] rounded-lg px-3 py-2 ${
+                        m.role === "user"
+                          ? "bg-emerald-50 text-emerald-900"
+                          : "bg-slate-100 text-slate-800"
+                      }`}
+                    >
+                      {m.content}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div className="flex gap-2 border-t p-2">
-            <input
-              value={msg}
-              onChange={(e) => setMsg(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && send()}
-              placeholder="Type a question…"
-              className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none"
-            />
-            <button
-              onClick={send}
-              disabled={!ready}
-              className="rounded-md bg-[#0c693c] px-3 py-2 text-sm text-white disabled:opacity-60"
-            >
-              Send
-            </button>
-          </div>
+
+              {/* Composer */}
+              <div className="flex items-end gap-2 border-t p-2">
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      send();
+                    }
+                  }}
+                  placeholder={placeholder}
+                  className="max-h-[120px] min-h-[40px] flex-1 resize-none rounded-md border border-slate-300 px-3 py-2 text-sm outline-none"
+                />
+                <button
+                  onClick={send}
+                  disabled={loading || !input.trim()}
+                  className="inline-flex items-center gap-2 rounded-md bg-[#0c693c] px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+                  aria-label="Send message"
+                >
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  <span className="hidden sm:inline">Send</span>
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </>
