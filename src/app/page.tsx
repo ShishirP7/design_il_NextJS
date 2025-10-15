@@ -13,6 +13,7 @@ import { CtaSplit } from "@/components/CtaSplit";
 import { BlogCards } from "@/components/BlogCards";
 import { ContactBand } from "@/components/ContactBand";
 import { SiteFooter } from "@/components/SiteFooter";
+import ChatWidget from "@/components/ChatWidget";
 
 export default function Home(){
   return (
@@ -20,6 +21,7 @@ export default function Home(){
       <TopBar />
       <Navbar />
       <Hero />
+      <ChatWidget />
       <IntroBand />
       <AssistSplit />
       <MissionBanner />
