@@ -6,17 +6,11 @@ import { MessageCircle, X, Minus, Send, Loader2 } from "lucide-react";
 type Msg = { role: "user" | "assistant"; content: string };
 
 type ChatWidgetProps = {
-  /** Override API base. Defaults to NEXT_PUBLIC_CHAT_API or http://localhost:9001 */
-  apiBase?: string;
-  /** Panel title */
+  apiBase?: string;         // Defaults to same-origin /api/chat
   title?: string;
-  /** Width class e.g. w-80, w-96, w-[26rem] */
-  widthClass?: string;
-  /** Height class e.g. h-[22rem], h-[28rem] */
-  heightClass?: string;
-  /** “bottom-right” | “bottom-left” */
+  widthClass?: string;      // e.g., "w-96"
+  heightClass?: string;     // e.g., "h-[28rem]"
   position?: "bottom-right" | "bottom-left";
-  /** Input placeholder */
   placeholder?: string;
 };
 
@@ -28,14 +22,13 @@ export default function ChatWidget({
   position = "bottom-right",
   placeholder = "Type a question…",
 }: ChatWidgetProps) {
-  const API_BASE =
-    useMemo(
-      () =>
-        (apiBase ??
-          process.env.NEXT_PUBLIC_CHAT_API?.replace(/\/$/, "") ??
-          "http://localhost:9001"),
-      [apiBase]
-    );
+  const API_BASE = useMemo(
+    () =>
+    (apiBase ??
+      process.env.NEXT_PUBLIC_CHAT_API?.replace(/\/$/, "") ??
+      ""),
+    [apiBase]
+  );
 
   const [open, setOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
@@ -43,27 +36,26 @@ export default function ChatWidget({
     { role: "assistant", content: "Hi! I can answer questions about our company and services." },
   ]);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // sending state
   const [unread, setUnread] = useState(false);
+
   const scrollerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // auto-scroll to bottom on new messages
+  // Auto-scroll to bottom
   useEffect(() => {
     scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight });
     if (!open) setUnread(true);
-  }, [messages, open]);
+  }, [messages, open, loading]);
 
-  // close on ESC
+  // ESC to close
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && open) setOpen(false);
-    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && open) setOpen(false); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  // autosize textarea
+  // Autosize composer textarea
   useEffect(() => {
     const el = inputRef.current;
     if (!el) return;
@@ -75,11 +67,13 @@ export default function ChatWidget({
     const q = input.trim();
     if (!q || loading) return;
 
-    setMessages((m) => [...m, { role: "user", content: q }, { role: "assistant", content: "…" }]);
+    // push user message
+    setMessages((m) => [...m, { role: "user", content: q }]);
     setInput("");
     setLoading(true);
 
     try {
+      const url = "api/chat"
       const res = await fetch(`/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -89,43 +83,32 @@ export default function ChatWidget({
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data: { reply?: string; error?: string } = await res.json();
 
-      setMessages((m) => {
-        const next = [...m];
-        next[next.length - 1] = {
-          role: "assistant",
-          content: (data.reply ?? "Sorry, I couldn’t generate a response.").trim(),
-        };
-        return next;
-      });
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", content: (data.reply ?? "Sorry, I couldn’t generate a response.").trim() },
+      ]);
     } catch {
-      setMessages((m) => {
-        const next = [...m];
-        next[next.length - 1] = {
+      setMessages((m) => [
+        ...m,
+        {
           role: "assistant",
           content:
-            "Hmm, I couldn’t reach the chat service. Make sure the API at :9001 is running with CORS enabled.",
-        };
-        return next;
-      });
+            "Hmm, I couldn’t reach the chat service. Make sure the API is running and accessible.",
+        },
+      ]);
     } finally {
       setLoading(false);
     }
   }
 
-  const cornerClasses =
-    position === "bottom-left"
-      ? "left-6 bottom-6"
-      : "right-6 bottom-6";
+  const cornerClasses = position === "bottom-left" ? "left-6 bottom-6" : "right-6 bottom-6";
 
   return (
     <>
-      {/* Launcher button */}
+      {/* Launcher */}
       {!open && (
         <button
-          onClick={() => {
-            setOpen(true);
-            setUnread(false);
-          }}
+          onClick={() => { setOpen(true); setUnread(false); }}
           aria-label="Open chat"
           className={`fixed ${cornerClasses} z-50 flex items-center gap-2 rounded-full bg-[#0c693c] px-4 py-3 text-white shadow-lg`}
         >
@@ -168,21 +151,32 @@ export default function ChatWidget({
             <>
               <div
                 ref={scrollerRef}
-                className={`px-3 py-3 text-sm ${heightClass} overflow-y-auto space-y-3`}
+                className={`px-3 py-3 pr-1 text-sm ${heightClass} max-h-[70vh] overflow-y-auto space-y-3`}
               >
                 {messages.map((m, i) => (
                   <div key={i} className={m.role === "user" ? "text-right" : ""}>
+                    {/* Bubble styling: assistant uses your green bubble; user uses soft gray */}
                     <div
-                      className={`inline-block max-w-[85%] rounded-lg px-3 py-2 ${
-                        m.role === "user"
-                          ? "bg-emerald-50 text-emerald-900"
-                          : "bg-slate-100 text-slate-800"
-                      }`}
+                      className={`chat-bubble-base ${m.role === "assistant" ? "chat-bubble-assistant" : "chat-bubble-user"
+                        }`}
                     >
-                      {m.content}
+                      <div className="content-wrap">{m.content}</div>
                     </div>
                   </div>
                 ))}
+
+                {/* Typing bubble while waiting for response */}
+                {loading && (
+                  <div className="text-left">
+                    <div className="chat-bubble-base chat-bubble-assistant">
+                      <div className="typing">
+                        <div className="dot" />
+                        <div className="dot" />
+                        <div className="dot" />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Composer */}
@@ -214,6 +208,78 @@ export default function ChatWidget({
           )}
         </div>
       )}
+
+      {/* Your typing/bubble CSS, scoped with styled-jsx */}
+      <style jsx>{`
+        /* Shared bubble base: wrap long words, keep line breaks */
+        .chat-bubble-base {
+          display: inline-block;
+          max-width: 85%;
+          padding: 16px 28px;
+          border-radius: 20px;
+          white-space: pre-wrap;
+          word-break: break-word;
+          overflow-wrap: anywhere;
+        }
+
+        /* Assistant bubble (matches your design) */
+        .chat-bubble-assistant {
+          background-color: #e6f8f1;
+          border-bottom-left-radius: 2px;
+        }
+
+        /* User bubble (simple neutral style) */
+        .chat-bubble-user {
+          background-color: #f2f4f7;
+          color: #0f172a;
+          border-bottom-right-radius: 2px;
+        }
+
+        .content-wrap {
+          /* just to keep content spacing consistent if needed */
+        }
+
+        /* Typing indicator */
+        .typing {
+          display: flex;
+          align-items: center;
+          height: 17px;
+        }
+        .typing .dot {
+          display: inline-block;
+          width: 7px;
+          height: 7px;
+          margin-right: 4px;
+          border-radius: 50%;
+          background-color: #6cad96;
+          animation: mercuryTypingAnimation 1.8s infinite ease-in-out;
+        }
+        .typing .dot:nth-child(1) {
+          animation-delay: 200ms;
+        }
+        .typing .dot:nth-child(2) {
+          animation-delay: 300ms;
+        }
+        .typing .dot:nth-child(3) {
+          animation-delay: 400ms;
+          margin-right: 0;
+        }
+
+        @keyframes mercuryTypingAnimation {
+          0% {
+            transform: translateY(0);
+            background-color: #6cad96;
+          }
+          28% {
+            transform: translateY(-7px);
+            background-color: #9ecab9;
+          }
+          44% {
+            transform: translateY(0);
+            background-color: #b5d9cb;
+          }
+        }
+      `}</style>
     </>
   );
 }
