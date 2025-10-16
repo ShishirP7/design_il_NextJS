@@ -1,13 +1,10 @@
-// src/app/api/chat/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
-// IMPORTANT: Keep Node runtime for the OpenAI SDK.
 export const runtime = "nodejs";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Company knowledge base (same as your Express code)
 const companyInfo = `
 We believe in equipping socially focused organizations (nonprofits, social enterprises, foundations, and schools) with the mindsets, frameworks, and tools to create innovators who impact their communities and the world.
 Innovation is a key driver of growth in the 21st-century economy. And organizations – of all kinds – increasingly rely on innovators to create and deliver this key driver in a constantly changing, globally competitive environment. We need to understand innovation – what it is, how to harness it, and why it is important.
@@ -52,7 +49,7 @@ ${companyInfo}`,
         },
         { role: "user", content: message },
       ],
-      max_tokens: 100,
+      max_tokens: 200,
       temperature: 0.4,
     });
 
@@ -64,7 +61,6 @@ ${companyInfo}`,
   }
 }
 
-// Optional simple health check
 export async function GET() {
   return NextResponse.json({ ok: true });
 }
