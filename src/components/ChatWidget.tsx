@@ -24,9 +24,9 @@ export default function ChatWidget({
 }: ChatWidgetProps) {
   const API_BASE = useMemo(
     () =>
-    (apiBase ??
-      process.env.NEXT_PUBLIC_CHAT_API?.replace(/\/$/, "") ??
-      ""),
+      (apiBase ??
+        process.env.NEXT_PUBLIC_CHAT_API?.replace(/\/$/, "") ??
+        ""),
     [apiBase]
   );
 
@@ -73,7 +73,6 @@ export default function ChatWidget({
     setLoading(true);
 
     try {
-      const url = "api/chat"
       const res = await fetch(`/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -114,14 +113,13 @@ export default function ChatWidget({
         >
           <MessageCircle className="h-5 w-5" />
           <span className="text-sm font-semibold">Chat</span>
-          {unread && <span className="ml-1 inline-block h-2 w-2 rounded-full bg-white" />}
         </button>
       )}
 
       {/* Panel */}
       {open && (
         <div
-          className={`fixed ${cornerClasses} z-50 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl ${widthClass}`}
+          className={`chat-panel fixed ${cornerClasses} z-50 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl ${widthClass}`}
           role="dialog"
           aria-label="Website chat"
         >
@@ -134,7 +132,7 @@ export default function ChatWidget({
                 className="rounded p-1 hover:bg-slate-100"
                 onClick={() => setMinimized((m) => !m)}
               >
-                {minimized ? <MessageCircle className="h-4 w-4" /> : <Minus className="h-4 w-4" />}
+                {/* you can add an icon here if you want */}
               </button>
               <button
                 aria-label="Close chat"
@@ -151,14 +149,13 @@ export default function ChatWidget({
             <>
               <div
                 ref={scrollerRef}
-                className={`px-3 py-3 pr-1 text-sm ${heightClass} max-h-[70vh] overflow-y-auto space-y-3`}
+                className={`chat-scroll px-3 py-3 pr-1 text-sm ${heightClass} max-h-[70vh] overflow-y-auto space-y-3`}
               >
                 {messages.map((m, i) => (
                   <div key={i} className={m.role === "user" ? "text-right" : ""}>
                     {/* Bubble styling: assistant uses your green bubble; user uses soft gray */}
                     <div
-                      className={`chat-bubble-base ${m.role === "assistant" ? "chat-bubble-assistant" : "chat-bubble-user"
-                        }`}
+                      className={`chat-bubble-base ${m.role === "assistant" ? "chat-bubble-assistant" : "chat-bubble-user"}`}
                     >
                       <div className="content-wrap">{m.content}</div>
                     </div>
@@ -192,7 +189,7 @@ export default function ChatWidget({
                     }
                   }}
                   placeholder={placeholder}
-                  className="max-h-[120px] min-h-[40px] flex-1 resize-none rounded-md border border-slate-300 px-3 py-2 text-sm outline-none"
+                  className="chat-input max-h-[120px] min-h-[40px] flex-1 resize-none rounded-md border border-slate-300 px-3 py-2 text-sm outline-none"
                 />
                 <button
                   onClick={send}
@@ -209,9 +206,26 @@ export default function ChatWidget({
         </div>
       )}
 
-      {/* Your typing/bubble CSS, scoped with styled-jsx */}
+      {/* Scoped styles (mobile responsiveness + typing animation) */}
       <style jsx>{`
-        /* Shared bubble base: wrap long words, keep line breaks */
+        /* ---- Mobile responsiveness ---- */
+        @media (max-width: 640px) {
+          .chat-panel {
+            /* Fit within the viewport on phones, even if widthClass is large */
+            width: min(92vw, 26rem);
+            right: 0.75rem;  /* keep a little margin from the edge */
+            left: auto;      /* ensure it doesn't stretch across */
+          }
+          .chat-scroll {
+            max-height: 65svh; /* keyboard-friendly viewport height */
+          }
+          .chat-input {
+            max-height: 40svh;
+            min-height: 44px;  /* easier to tap */
+          }
+        }
+
+        /* ---- Bubbles ---- */
         .chat-bubble-base {
           display: inline-block;
           max-width: 85%;
@@ -221,25 +235,17 @@ export default function ChatWidget({
           word-break: break-word;
           overflow-wrap: anywhere;
         }
-
-        /* Assistant bubble (matches your design) */
         .chat-bubble-assistant {
           background-color: #e6f8f1;
           border-bottom-left-radius: 2px;
         }
-
-        /* User bubble (simple neutral style) */
         .chat-bubble-user {
           background-color: #f2f4f7;
           color: #0f172a;
           border-bottom-right-radius: 2px;
         }
 
-        .content-wrap {
-          /* just to keep content spacing consistent if needed */
-        }
-
-        /* Typing indicator */
+        /* ---- Typing animation ---- */
         .typing {
           display: flex;
           align-items: center;
@@ -254,30 +260,14 @@ export default function ChatWidget({
           background-color: #6cad96;
           animation: mercuryTypingAnimation 1.8s infinite ease-in-out;
         }
-        .typing .dot:nth-child(1) {
-          animation-delay: 200ms;
-        }
-        .typing .dot:nth-child(2) {
-          animation-delay: 300ms;
-        }
-        .typing .dot:nth-child(3) {
-          animation-delay: 400ms;
-          margin-right: 0;
-        }
+        .typing .dot:nth-child(1) { animation-delay: 200ms; }
+        .typing .dot:nth-child(2) { animation-delay: 300ms; }
+        .typing .dot:nth-child(3) { animation-delay: 400ms; margin-right: 0; }
 
         @keyframes mercuryTypingAnimation {
-          0% {
-            transform: translateY(0);
-            background-color: #6cad96;
-          }
-          28% {
-            transform: translateY(-7px);
-            background-color: #9ecab9;
-          }
-          44% {
-            transform: translateY(0);
-            background-color: #b5d9cb;
-          }
+          0%   { transform: translateY(0);   background-color: #6cad96; }
+          28%  { transform: translateY(-7px); background-color: #9ecab9; }
+          44%  { transform: translateY(0);    background-color: #b5d9cb; }
         }
       `}</style>
     </>
